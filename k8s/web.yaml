@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teampass-web
+  namespace: teampass
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: teampass-web
+  template:
+    metadata:
+      labels:
+        app: teampass-web
+    spec:
+      initContainers:
+        - name: prepare-volumes
+          image: alpine:3.20
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /work/sk /work/files /work/upload /security
+              chown -R 100:101 /work/sk /work/files /work/upload /security
+              chmod 700 /work/sk
+              chmod 750 /work/files /work/upload /security
+          volumeMounts:
+            - name: teampass-sk
+              mountPath: /work/sk
+            - name: teampass-files
+              mountPath: /work/files
+            - name: teampass-upload
+              mountPath: /work/upload
+            - name: teampass-security
+              mountPath: /security
+      containers:
+        - name: teampass-web
+          image: localhost:30500/teampass:3.1.7.5-arm64-r5
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: DB_HOST
+              value: db
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: mysql-database
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: mysql-user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: mysql-password
+            - name: DB_PREFIX
+              value: teampass_
+            - name: INSTALL_MODE
+              value: manual
+            - name: TEAMPASS_URL
+              value: http://192.168.3.159:30088
+            - name: PHP_MEMORY_LIMIT
+              value: 512M
+            - name: PHP_UPLOAD_MAX_FILESIZE
+              value: 100M
+            - name: PHP_POST_MAX_SIZE
+              value: 100M
+            - name: PHP_MAX_EXECUTION_TIME
+              value: "300"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: teampass-sk
+              mountPath: /var/www/html/sk
+            - name: teampass-files
+              mountPath: /var/www/html/files
+            - name: teampass-upload
+              mountPath: /var/www/html/upload
+            - name: teampass-security
+              mountPath: /var/TeampassSecurity
+      volumes:
+        - name: teampass-sk
+          persistentVolumeClaim:
+            claimName: teampass-sk-pvc
+        - name: teampass-files
+          persistentVolumeClaim:
+            claimName: teampass-files-pvc
+        - name: teampass-upload
+          persistentVolumeClaim:
+            claimName: teampass-upload-pvc
+        - name: teampass-security
+          persistentVolumeClaim:
+            claimName: teampass-security-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teampass-web
+  namespace: teampass
+spec:
+  type: NodePort
+  selector:
+    app: teampass-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30088
