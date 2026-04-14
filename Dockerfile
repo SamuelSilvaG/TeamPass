@@ -4,6 +4,7 @@ FROM richarvey/nginx-php-fpm:latest
 ARG VOL=/var/www/html
 ENV VOL ${VOL}
 VOLUME ${VOL}
+WORKDIR ${VOL}
 
 # Configure nginx-php-fpm image to use this dir.
 ENV WEBROOT ${VOL}
@@ -37,6 +38,7 @@ RUN sed -i "/^}/i \
   }" /etc/nginx/sites-enabled/default.conf
 
 COPY teampass-docker-start.sh /teampass-docker-start.sh
+COPY . ${VOL}
 
 # Configure nginx-php-fpm image to pull our code.
 ENV REPO_URL https://github.com/nilsteampassnet/TeamPass.git

@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: teampass
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:11.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: mysql-root-password
+            - name: MARIADB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: mysql-database
+            - name: MARIADB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: mysql-user
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: mysql-password
+            - name: MARIADB_AUTO_UPGRADE
+              value: "1"
+            - name: MARIADB_INITDB_SKIP_TZINFO
+              value: "1"
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+            - --max_allowed_packet=64M
+            - --innodb_buffer_pool_size=256M
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mariadb-admin ping -h 127.0.0.1 -uroot -p"$MARIADB_ROOT_PASSWORD"
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mariadb-admin ping -h 127.0.0.1 -uroot -p"$MARIADB_ROOT_PASSWORD"
+            initialDelaySeconds: 45
+            periodSeconds: 20
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: teampass-db-data
+              mountPath: /var/lib/mysql
+            - name: teampass-db-config
+              mountPath: /etc/mysql/conf.d/custom.cnf
+              subPath: custom.cnf
+      volumes:
+        - name: teampass-db-data
+          persistentVolumeClaim:
+            claimName: teampass-db-pvc
+        - name: teampass-db-config
+          configMap:
+            name: teampass-db-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: teampass
+spec:
+  selector:
+    app: db
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql

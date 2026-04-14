@@ -1,0 +1,134 @@
+Name:             teampass-web-65d4844b99-cnghg
+Namespace:        teampass
+Priority:         0
+Service Account:  default
+Node:             pi-k3s-1/192.168.3.159
+Start Time:       Tue, 14 Apr 2026 12:00:54 -0300
+Labels:           app=teampass-web
+                  pod-template-hash=65d4844b99
+Annotations:      <none>
+Status:           Running
+IP:               10.42.0.127
+IPs:
+  IP:           10.42.0.127
+Controlled By:  ReplicaSet/teampass-web-65d4844b99
+Init Containers:
+  prepare-volumes:
+    Container ID:  containerd://91a97c46ad83ab2a1633b254389323e94a8b880fced038e1d9dd9450ef0db900
+    Image:         alpine:3.20
+    Image ID:      docker.io/library/alpine@sha256:a4f4213abb84c497377b8544c81b3564f313746700372ec4fe84653e4fb03805
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -c
+      mkdir -p /work/sk /work/files /work/upload /var/teampass
+      chown -R 100:101 /work/sk /work/files /work/upload /var/teampass
+      chmod 700 /work/sk
+      chmod 750 /work/files /work/upload /var/teampass
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Tue, 14 Apr 2026 12:00:56 -0300
+      Finished:     Tue, 14 Apr 2026 12:00:56 -0300
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-62nwq (ro)
+      /var/teampass from teampass-security (rw)
+      /work/files from teampass-files (rw)
+      /work/sk from teampass-sk (rw)
+      /work/upload from teampass-upload (rw)
+Containers:
+  teampass-web:
+    Container ID:   containerd://347a1cc030f8619bc32435de02a2f9488054c439fc4a6ae5e79a4b7008f8d881
+    Image:          localhost:30500/teampass:latest
+    Image ID:       localhost:30500/teampass@sha256:58f24d2ff4fca9c296d89765c93060e7c917bd8af6c5255add44cb5fb88b0c7d
+    Port:           80/TCP
+    Host Port:      0/TCP
+    State:          Terminated
+      Reason:       Error
+      Exit Code:    255
+      Started:      Tue, 14 Apr 2026 12:02:23 -0300
+      Finished:     Tue, 14 Apr 2026 12:02:27 -0300
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    255
+      Started:      Tue, 14 Apr 2026 12:01:47 -0300
+      Finished:     Tue, 14 Apr 2026 12:01:51 -0300
+    Ready:          False
+    Restart Count:  3
+    Liveness:       http-get http://:http/health delay=30s timeout=5s period=20s #success=1 #failure=3
+    Readiness:      http-get http://:http/health delay=45s timeout=5s period=10s #success=1 #failure=3
+    Environment:
+      DB_HOST:                  db
+      DB_PORT:                  3306
+      DB_NAME:                  <set to the key 'mysql-database' in secret 'teampass-db-secret'>  Optional: false
+      DB_USER:                  <set to the key 'mysql-user' in secret 'teampass-db-secret'>      Optional: false
+      DB_PASSWORD:              <set to the key 'mysql-password' in secret 'teampass-db-secret'>  Optional: false
+      DB_PREFIX:                teampass_
+      INSTALL_MODE:             auto
+      ADMIN_EMAIL:              <set to the key 'admin-email' in secret 'teampass-db-secret'>  Optional: false
+      ADMIN_PWD:                <set to the key 'admin-pwd' in secret 'teampass-db-secret'>    Optional: false
+      TEAMPASS_URL:             http://192.168.3.159:30088
+      PHP_MEMORY_LIMIT:         512M
+      PHP_UPLOAD_MAX_FILESIZE:  100M
+      PHP_POST_MAX_SIZE:        100M
+      PHP_MAX_EXECUTION_TIME:   300
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-62nwq (ro)
+      /var/teampass from teampass-security (rw)
+      /var/www/html/files from teampass-files (rw)
+      /var/www/html/sk from teampass-sk (rw)
+      /var/www/html/upload from teampass-upload (rw)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       False 
+  ContainersReady             False 
+  PodScheduled                True 
+Volumes:
+  teampass-sk:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  teampass-sk-pvc
+    ReadOnly:   false
+  teampass-files:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  teampass-files-pvc
+    ReadOnly:   false
+  teampass-upload:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  teampass-upload-pvc
+    ReadOnly:   false
+  teampass-security:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  teampass-security-pvc
+    ReadOnly:   false
+  kube-api-access-62nwq:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  97s                default-scheduler  Successfully assigned teampass/teampass-web-65d4844b99-cnghg to pi-k3s-1
+  Normal   Pulled     97s                kubelet            Container image "alpine:3.20" already present on machine
+  Normal   Created    97s                kubelet            Created container: prepare-volumes
+  Normal   Started    96s                kubelet            Started container prepare-volumes
+  Normal   Pulled     79s                kubelet            Successfully pulled image "localhost:30500/teampass:latest" in 16.476s (16.476s including waiting). Image size: 134572854 bytes.
+  Normal   Pulled     63s                kubelet            Successfully pulled image "localhost:30500/teampass:latest" in 269ms (269ms including waiting). Image size: 134572854 bytes.
+  Normal   Pulled     45s                kubelet            Successfully pulled image "localhost:30500/teampass:latest" in 300ms (300ms including waiting). Image size: 134572854 bytes.
+  Normal   Pulling    10s (x4 over 95s)  kubelet            Pulling image "localhost:30500/teampass:latest"
+  Normal   Created    9s (x4 over 79s)   kubelet            Created container: teampass-web
+  Normal   Started    9s (x4 over 79s)   kubelet            Started container teampass-web
+  Normal   Pulled     9s                 kubelet            Successfully pulled image "localhost:30500/teampass:latest" in 268ms (268ms including waiting). Image size: 134572854 bytes.
+  Warning  BackOff    5s (x6 over 58s)   kubelet            Back-off restarting failed container teampass-web in pod teampass-web-65d4844b99-cnghg_teampass(fcf10aa8-f20a-41c6-b90a-d6b0c26f7fbd)

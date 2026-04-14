@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teampass-web
+spec:
+  template:
+    spec:
+      containers:
+        - name: teampass-web
+          env:
+            - name: INSTALL_MODE
+              value: manual

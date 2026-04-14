@@ -150,11 +150,17 @@ class DatabaseInstaller
     public function handleAction(): array
     {
         try {
-            if (method_exists($this, $this->inputData['action'])) {
+            $action = $this->inputData['action'];
+            if (is_array($action)) {
+                $action = array_values($action)[0] ?? '';
+                $this->inputData['action'] = $action;
+            }
+            if (is_string($action) && method_exists($this, $action)) {
                 // Dynamically call the method corresponding to the action
-                call_user_func([$this, $this->inputData['action']]);
+                call_user_func([$this, $action]);
             } else {
-                throw new Exception('Action not recognized: ' . $this->inputData);
+                $actionDesc = is_string($action) ? $action : json_encode($action);
+                throw new Exception('Action not recognized: ' . $actionDesc);
             }
 
             return [

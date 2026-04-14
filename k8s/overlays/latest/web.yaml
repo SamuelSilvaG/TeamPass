@@ -62,10 +62,7 @@ spec:
                   name: teampass-db-secret
                   key: mysql-password
             - name: DB_PREFIX
-              valueFrom:
-                secretKeyRef:
-                  name: teampass-db-secret
-                  key: mysql-prefix
+              value: teampass_
             - name: INSTALL_MODE
               value: auto
             - name: ADMIN_EMAIL

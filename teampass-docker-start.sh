@@ -1,27 +1,28 @@
 #!/bin/sh
-if [ ! -d ${VOL}/.git ];
+mkdir -p ${VOL}
+cd ${VOL}
+
+if [ ! -f ${VOL}/index.php ];
 then
 	echo "Initial setup..."
 	if [ -z ${GIT_TAG} ]; then
-	    #git clone $REPO_URL ${VOL} # Errors out due to directory not being empty
-		git init
+	    # Clone the default branch into the web root
+		git init ${VOL}
+		cd ${VOL}
 		git remote add origin $REPO_URL
-		git pull
+		git pull origin master
 		git checkout master -f
 	else
-	    #git clone -b $GIT_TAG $REPO_URL ${VOL}
-		git init
+		# Clone the requested tag into the web root
+		git init ${VOL}
+		cd ${VOL}
 		git remote add origin $REPO_URL
-		git pull
+		git pull origin $GIT_TAG
 		git checkout $GIT_TAG -f
 	fi
-	mkdir ${VOL}/sk
-	mkdir ${VOL}/includes/libraries/csrfp/log
+	mkdir -p ${VOL}/sk
+	mkdir -p ${VOL}/includes/libraries/csrfp/log
 	chown -Rf nginx:nginx ${VOL}
-	
-        
-
-
 fi
 
 if [ -f ${VOL}/includes/config/settings.php ] ;

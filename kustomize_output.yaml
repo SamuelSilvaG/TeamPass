@@ -1,0 +1,343 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: teampass
+---
+apiVersion: v1
+data:
+  custom.cnf: |
+    [mysqld]
+    sql_mode = NO_ENGINE_SUBSTITUTION
+    character-set-server = utf8mb4
+    collation-server = utf8mb4_unicode_ci
+    max_allowed_packet = 64M
+    max_connections = 150
+    table_open_cache = 2000
+    tmp_table_size = 64M
+    max_heap_table_size = 64M
+    innodb_buffer_pool_size = 256M
+    innodb_log_file_size = 64M
+    innodb_flush_log_at_trx_commit = 2
+    innodb_flush_method = fsync
+    slow_query_log = 0
+    long_query_time = 2
+
+    [client]
+    default-character-set = utf8mb4
+
+    [mysql]
+    default-character-set = utf8mb4
+kind: ConfigMap
+metadata:
+  name: teampass-db-config
+  namespace: teampass
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: teampass-db-secret
+  namespace: teampass
+stringData:
+  admin-email: admin@teampass.local
+  admin-pwd: Teampass@123
+  mysql-database: teampass
+  mysql-password: teampass
+  mysql-root-password: 5BkDuudAYeWEJs
+  mysql-user: teampass
+type: Opaque
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: teampass
+spec:
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: mysql
+  selector:
+    app: db
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: teampass-web
+  namespace: teampass
+spec:
+  ports:
+  - name: http
+    nodePort: 30088
+    port: 80
+    targetPort: http
+  selector:
+    app: teampass-web
+  type: NodePort
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-db-pvc
+  namespace: teampass
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-files-pvc
+  namespace: teampass
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-security-pvc
+  namespace: teampass
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-sk-pvc
+  namespace: teampass
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-upload-pvc
+  namespace: teampass
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: teampass
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+      - args:
+        - --character-set-server=utf8mb4
+        - --collation-server=utf8mb4_unicode_ci
+        - --max_allowed_packet=64M
+        - --innodb_buffer_pool_size=256M
+        env:
+        - name: MARIADB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: mysql-root-password
+              name: teampass-db-secret
+        - name: MARIADB_DATABASE
+          valueFrom:
+            secretKeyRef:
+              key: mysql-database
+              name: teampass-db-secret
+        - name: MARIADB_USER
+          valueFrom:
+            secretKeyRef:
+              key: mysql-user
+              name: teampass-db-secret
+        - name: MARIADB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: mysql-password
+              name: teampass-db-secret
+        - name: MARIADB_AUTO_UPGRADE
+          value: "1"
+        - name: MARIADB_INITDB_SKIP_TZINFO
+          value: "1"
+        image: mariadb:11.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - mariadb-admin ping -h 127.0.0.1 -uroot -p"$MARIADB_ROOT_PASSWORD"
+          initialDelaySeconds: 45
+          periodSeconds: 20
+          timeoutSeconds: 5
+        name: mariadb
+        ports:
+        - containerPort: 3306
+          name: mysql
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - mariadb-admin ping -h 127.0.0.1 -uroot -p"$MARIADB_ROOT_PASSWORD"
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - mountPath: /var/lib/mysql
+          name: teampass-db-data
+        - mountPath: /etc/mysql/conf.d/custom.cnf
+          name: teampass-db-config
+          subPath: custom.cnf
+      volumes:
+      - name: teampass-db-data
+        persistentVolumeClaim:
+          claimName: teampass-db-pvc
+      - configMap:
+          name: teampass-db-config
+        name: teampass-db-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teampass-web
+  namespace: teampass
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: teampass-web
+  template:
+    metadata:
+      labels:
+        app: teampass-web
+    spec:
+      containers:
+      - env:
+        - name: DB_HOST
+          value: db
+        - name: DB_PORT
+          value: "3306"
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              key: mysql-database
+              name: teampass-db-secret
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              key: mysql-user
+              name: teampass-db-secret
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: mysql-password
+              name: teampass-db-secret
+        - name: DB_PREFIX
+          value: teampass_
+        - name: INSTALL_MODE
+          value: auto
+        - name: ADMIN_EMAIL
+          valueFrom:
+            secretKeyRef:
+              key: admin-email
+              name: teampass-db-secret
+        - name: ADMIN_PWD
+          valueFrom:
+            secretKeyRef:
+              key: admin-pwd
+              name: teampass-db-secret
+        - name: TEAMPASS_URL
+          value: http://192.168.3.159:30088
+        - name: PHP_MEMORY_LIMIT
+          value: 512M
+        - name: PHP_UPLOAD_MAX_FILESIZE
+          value: 100M
+        - name: PHP_POST_MAX_SIZE
+          value: 100M
+        - name: PHP_MAX_EXECUTION_TIME
+          value: "300"
+        image: localhost:30500/teampass:latest
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
+        name: teampass-web
+        ports:
+        - containerPort: 80
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 45
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - mountPath: /var/www/html/sk
+          name: teampass-sk
+        - mountPath: /var/www/html/files
+          name: teampass-files
+        - mountPath: /var/www/html/upload
+          name: teampass-upload
+        - mountPath: /var/teampass
+          name: teampass-security
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - |
+          mkdir -p /work/sk /work/files /work/upload /var/teampass
+          chown -R 100:101 /work/sk /work/files /work/upload /var/teampass
+          chmod 700 /work/sk
+          chmod 750 /work/files /work/upload /var/teampass
+        image: alpine:3.20
+        imagePullPolicy: IfNotPresent
+        name: prepare-volumes
+        volumeMounts:
+        - mountPath: /work/sk
+          name: teampass-sk
+        - mountPath: /work/files
+          name: teampass-files
+        - mountPath: /work/upload
+          name: teampass-upload
+        - mountPath: /var/teampass
+          name: teampass-security
+      volumes:
+      - name: teampass-sk
+        persistentVolumeClaim:
+          claimName: teampass-sk-pvc
+      - name: teampass-files
+        persistentVolumeClaim:
+          claimName: teampass-files-pvc
+      - name: teampass-upload
+        persistentVolumeClaim:
+          claimName: teampass-upload-pvc
+      - name: teampass-security
+        persistentVolumeClaim:
+          claimName: teampass-security-pvc
