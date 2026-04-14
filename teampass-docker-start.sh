@@ -5,24 +5,22 @@ cd ${VOL}
 if [ ! -f ${VOL}/index.php ];
 then
 	echo "Initial setup..."
+	git config --global --add safe.directory ${VOL}
 	if [ -z ${GIT_TAG} ]; then
 	    # Clone the default branch into the web root
-		git init ${VOL}
-		cd ${VOL}
-		git remote add origin $REPO_URL
-		git pull origin master
-		git checkout master -f
+		git clone --depth 1 $REPO_URL ${VOL}
 	else
 		# Clone the requested tag into the web root
-		git init ${VOL}
-		cd ${VOL}
-		git remote add origin $REPO_URL
-		git pull origin $GIT_TAG
-		git checkout $GIT_TAG -f
+		git clone --depth 1 --branch $GIT_TAG $REPO_URL ${VOL}
 	fi
 	mkdir -p ${VOL}/sk
 	mkdir -p ${VOL}/includes/libraries/csrfp/log
 	chown -Rf nginx:nginx ${VOL}
+	git config --global --add safe.directory ${VOL}
+	# Apply fixes
+	if [ -f /apply-fixes.sh ]; then
+		/apply-fixes.sh
+	fi
 fi
 
 if [ -f ${VOL}/includes/config/settings.php ] ;

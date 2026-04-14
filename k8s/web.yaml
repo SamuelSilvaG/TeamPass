@@ -83,9 +83,9 @@ spec:
             - name: PHP_MEMORY_LIMIT
               value: 512M
             - name: PHP_UPLOAD_MAX_FILESIZE
-              value: 100M
+              value: "100"
             - name: PHP_POST_MAX_SIZE
-              value: 100M
+              value: "100"
             - name: PHP_MAX_EXECUTION_TIME
               value: "300"
           readinessProbe:
