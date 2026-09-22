@@ -1,0 +1,28 @@
+# ============================================
+# TeamPass - Kustomization
+# Aplica todos os manifests em ordem
+# ============================================
+# Uso:
+#   kubectl apply -k k8s/
+#
+# Para ver o que seria aplicado (dry-run):
+#   kubectl apply -k k8s/ --dry-run=client
+# ============================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: teampass
+
+resources:
+  - 00-namespace.yaml
+  - 01-secrets.yaml
+  - 02-configmap.yaml
+  - 03-pvc.yaml
+  - 04-mariadb.yaml
+  - 05-teampass.yaml
+  # Descomente se precisar expor o registry via NodePort
+  # - 06-registry-nodeport.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  environment: development

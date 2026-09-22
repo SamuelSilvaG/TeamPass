@@ -1,0 +1,131 @@
+# ============================================
+# TeamPass Docker Compose - Raspberry Pi 4
+# Versão inicial: 3.1.7.6 (ARM64/aarch64)
+# ============================================
+#
+# USO:
+#   1. Copie .env.rpi para .env e ajuste as variáveis
+#   2. Inicie com: docker compose up -d
+#   3. Acesse http://<IP-DO-PI>:8080 para instalar via web
+#
+# ATUALIZAÇÃO DE VERSÃO:
+#   1. Faça backup: docker compose exec db mysqldump -u root -p${MARIADB_ROOT_PASSWORD} teampass > backup_$(date +%Y%m%d).sql
+#   2. Edite TEAMPASS_VERSION no .env para a versão desejada
+#   3. Execute: docker compose pull && docker compose up -d
+#   O entrypoint detecta a diferença de versão e executa as migrações automaticamente.
+# ============================================
+
+services:
+  # ----------------------------------------
+  # TeamPass Application
+  # ----------------------------------------
+  teampass:
+    # A imagem oficial suporta linux/arm64 (Raspberry Pi 4 com OS 64-bit)
+    # Troque a versão no .env para atualizar (ex: 3.2.2.5)
+    image: teampass/teampass:${TEAMPASS_VERSION:-3.1.7.6}
+    container_name: teampass-app
+    restart: unless-stopped
+
+    # Garante que a plataforma correta seja usada no Pi 4 (aarch64)
+    platform: linux/arm64
+
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-teampass}
+      DB_USER: ${DB_USER:-teampass}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PREFIX: ${DB_PREFIX:-teampass_}
+
+      INSTALL_MODE: ${INSTALL_MODE:-manual}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@teampass.local}
+      ADMIN_PWD: ${ADMIN_PWD:-}
+      TEAMPASS_URL: ${TEAMPASS_URL:-http://localhost:8080}
+
+      # PHP ajustado para RAM do Pi 4 (4GB)
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-256M}
+      PHP_UPLOAD_MAX_FILESIZE: ${PHP_UPLOAD_MAX_FILESIZE:-50M}
+      PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-50M}
+      PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-120}
+
+    volumes:
+      - teampass-sk:/var/www/html/storage/sk
+      - teampass-files:/var/www/html/storage/files
+      - teampass-upload:/var/www/html/storage/upload
+      - teampass-config:/var/www/html/storage/config
+      - teampass-secrets:/var/www/html/secrets
+
+    ports:
+      - "${TEAMPASS_PORT:-8080}:80"
+
+    networks:
+      - teampass-network
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+    labels:
+      - "com.teampass.description=TeamPass Application"
+      - "com.teampass.version=${TEAMPASS_VERSION:-3.1.7.6}"
+      - "com.teampass.platform=raspberry-pi4"
+
+  # ----------------------------------------
+  # MariaDB Database
+  # ----------------------------------------
+  db:
+    image: mariadb:${MARIADB_VERSION:-11.2}
+    container_name: teampass-db
+    restart: unless-stopped
+
+    platform: linux/arm64
+
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME:-teampass}
+      MARIADB_USER: ${DB_USER:-teampass}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_AUTO_UPGRADE: "1"
+      MARIADB_INITDB_SKIP_TZINFO: "1"
+
+    volumes:
+      - teampass-db:/var/lib/mysql
+      - ./mariadb-custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
+
+    networks:
+      - teampass-network
+
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_allowed_packet=64M
+      - --innodb_buffer_pool_size=128M
+
+    labels:
+      - "com.teampass.description=TeamPass Database"
+
+networks:
+  teampass-network:
+    driver: bridge
+
+volumes:
+  teampass-sk:
+  teampass-files:
+  teampass-upload:
+  teampass-config:
+  teampass-secrets:
+  teampass-db:

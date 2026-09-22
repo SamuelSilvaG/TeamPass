@@ -1,0 +1,10 @@
+# ============================================
+# TeamPass - Namespace
+# ============================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/part-of: teampass

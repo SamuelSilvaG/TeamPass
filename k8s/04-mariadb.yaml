@@ -1,0 +1,126 @@
+# ============================================
+# TeamPass - MariaDB Deployment + Service
+# ============================================
+
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teampass-db
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: teampass-db
+  # Garantir que somente um pod de DB suba por vez (RWO)
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: teampass-db
+        app.kubernetes.io/name: teampass
+        app.kubernetes.io/component: database
+    spec:
+      # Prefere rodar em ARM64 (Raspberry Pi 4)
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+        - name: mariadb
+          image: mariadb:11.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+            - --max_allowed_packet=64M
+            - --innodb_buffer_pool_size=128M
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: db-root-password
+            - name: MARIADB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: db-name
+            - name: MARIADB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: db-user
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: teampass-db-secret
+                  key: db-password
+            - name: MARIADB_AUTO_UPGRADE
+              value: "1"
+            - name: MARIADB_INITDB_SKIP_TZINFO
+              value: "1"
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - name: db-data
+              mountPath: /var/lib/mysql
+            - name: db-config
+              mountPath: /etc/mysql/conf.d/custom.cnf
+              subPath: custom.cnf
+          livenessProbe:
+            exec:
+              command:
+                - healthcheck.sh
+                - --connect
+                - --innodb_initialized
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - healthcheck.sh
+                - --connect
+                - --innodb_initialized
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "200Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: teampass-db
+        - name: db-config
+          configMap:
+            name: mariadb-config
+---
+# Service (ClusterIP — apenas interno ao cluster)
+apiVersion: v1
+kind: Service
+metadata:
+  name: teampass-db
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  selector:
+    app: teampass-db
+  ports:
+    - port: 3306
+      targetPort: 3306
+      name: mysql

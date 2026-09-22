@@ -1,0 +1,28 @@
+# ============================================
+# TeamPass - Registry NodePort (porta 30500)
+# Expõe o registry local do k3s para que o
+# build-push.sh consiga fazer push da imagem
+# ============================================
+# APLIQUE ESTE ARQUIVO ANTES DE FAZER O PRIMEIRO BUILD
+# kubectl apply -f k8s/06-registry.yaml
+# ============================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-nodeport
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: registry
+    app.kubernetes.io/component: registry
+spec:
+  type: NodePort
+  selector:
+    # Seleciona o registry interno do k3s (se habilitado com --cluster-registry)
+    # Se usar o registry padrão do k3s, o label pode ser diferente — ajuste conforme:
+    #   kubectl get pods -n kube-system -l app=registry
+    app: registry
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30500
+      name: registry
