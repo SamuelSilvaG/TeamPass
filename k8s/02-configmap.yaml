@@ -19,7 +19,7 @@ data:
   ADMIN_EMAIL: "admin@teampass.local"
   # URL de acesso via NodePort do k3s no Raspberry Pi
   # Substitua pelo IP real do seu Pi
-  TEAMPASS_URL: "http://192.168.1.100:30080"
+  TEAMPASS_URL: "http://192.168.1.100:30090"
   PHP_MEMORY_LIMIT: "256M"
   PHP_UPLOAD_MAX_FILESIZE: "50M"
   PHP_POST_MAX_SIZE: "50M"

@@ -150,6 +150,6 @@ spec:
   ports:
     - port: 80
       targetPort: 80
-      # NodePort fixo para acesso via http://<IP-DO-PI>:30080
-      nodePort: 30080
+      # NodePort fixo para acesso via http://<IP-DO-PI>:30090
+      nodePort: 30090
       name: http
