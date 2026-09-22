@@ -3,7 +3,11 @@
 # ============================================
 
 # Stage 1: Composer dependencies builder
-FROM composer:2.7 AS composer-builder
+# Current Composer line. The installed versions come from composer.lock, not from this
+# binary, so the only thing the version buys is Composer's own fixes — hence "latest
+# supported line" rather than an alignment with any particular developer setup. Pinned to
+# the minor line, never to "latest", so a future major cannot land silently.
+FROM docker.io/library/composer:2.10 AS composer-builder
 
 WORKDIR /app
 
@@ -11,8 +15,8 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 
 # Copy local packages required by composer
-COPY includes/libraries/teampassclasses ./includes/libraries/teampassclasses
-COPY includes/libraries/ezimuel ./includes/libraries/ezimuel
+COPY app/includes/libraries/teampassclasses ./app/includes/libraries/teampassclasses
+COPY app/includes/libraries/ezimuel ./app/includes/libraries/ezimuel
 
 # Install production dependencies only
 RUN composer install \
@@ -26,7 +30,7 @@ RUN composer install \
 # ============================================
 # Stage 2: Final production image
 # ============================================
-FROM php:8.3-fpm-alpine3.19
+FROM docker.io/library/php:8.3-fpm-alpine3.24
 
 # Metadata labels
 LABEL maintainer="TeamPass <nils@teampass.net>" \
@@ -34,13 +38,33 @@ LABEL maintainer="TeamPass <nils@teampass.net>" \
       org.opencontainers.image.description="Collaborative Passwords Manager" \
       org.opencontainers.image.url="https://teampass.net" \
       org.opencontainers.image.source="https://github.com/nilsteampassnet/TeamPass" \
-      org.opencontainers.image.documentation="https://teampass.readthedocs.io" \
+      org.opencontainers.image.documentation="https://documentation.teampass.net" \
       org.opencontainers.image.licenses="GPL-3.0" \
       org.opencontainers.image.vendor="TeamPass"
 
 # Build arguments
-ARG TEAMPASS_VERSION=3.1.5.2
+# The CI workflow overrides this with the value it reads from app/config/include.php,
+# so every published image reports the version it actually contains (a branch build
+# used to be labelled "master"). The default only serves local builds, so it must stay
+# equal to TP_VERSION.TP_VERSION_MINOR; the release procedure bumps it in the same
+# commit as the version constants.
+ARG TEAMPASS_VERSION=3.1.7.6
 ENV TEAMPASS_VERSION=${TEAMPASS_VERSION}
+
+# Apply the Alpine security updates published since the base image was built.
+#
+# openssl and curl are not installed below - they come with php:8.3-fpm-alpine3.24 - so
+# nothing here ever refreshed them, and the image shipped whatever the base image froze.
+# That is what accumulated as Trivy alerts (libcrypto3/libssl3/openssl and curl/libcurl),
+# all of them fixed upstream in the very branch the image already tracks.
+#
+# The trade-off is deliberate: the build stops being byte-reproducible across time, in
+# exchange for never publishing an image with known-vulnerable OS packages. Pinning the
+# fixed versions instead would keep reproducibility but has to be edited at every CVE.
+#
+# Placed AFTER the version ARG on purpose: that argument changes at every release, so this
+# layer is invalidated with it and a release build always resolves fresh packages.
+RUN apk upgrade --no-cache
 
 # Install system dependencies and PHP extensions
 RUN apk add --no-cache \
@@ -93,8 +117,12 @@ RUN apk add --no-cache \
     && apk del .build-deps \
     && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
 
-# Add GNU libiconv for better performance
-ENV LD_PRELOAD /usr/lib/preloadable_libiconv.so
+# No LD_PRELOAD of preloadable_libiconv.so on purpose: Alpine has not shipped that
+# file for several releases. The gnu-libiconv package only provides the gnu-iconv
+# binary, and gnu-libiconv-libs provides libiconv.so.2, which exports the prefixed
+# symbols (libiconv_open, …) and therefore cannot shadow musl's iconv. Setting the
+# classic workaround would only make every process log an ld.so error. PHP uses
+# musl's iconv.
 
 # Copy PHP configuration
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/teampass.ini
@@ -113,27 +141,34 @@ WORKDIR /var/www/html
 COPY --chown=nginx:nginx . .
 
 # Copy vendor from composer builder
-COPY --from=composer-builder --chown=nginx:nginx /app/vendor ./vendor
+COPY --from=composer-builder --chown=nginx:nginx /app/app/vendor ./app/vendor
 
 # Create required directories with proper permissions
 RUN mkdir -p \
-    sk \
-    files \
-    upload \
-    includes/libraries/csrfp/log \
+    storage/sk \
+    storage/files \
+    storage/upload \
+    storage/config \
+    storage/backups \
+    secrets \
+    app/includes/libraries/csrfp/log \
     /var/lib/nginx/tmp \
     /var/log/supervisor \
     /run/nginx \
     && chown -R nginx:nginx \
-        sk \
-        files \
-        upload \
-        includes/libraries/csrfp/log \
+        storage \
+        storage/sk \
+        storage/files \
+        storage/upload \
+        storage/config \
+        storage/backups \
+        secrets \
+        app/includes/libraries/csrfp/log \
         /var/lib/nginx \
         /var/log \
         /run/nginx \
-    && chmod 700 sk \
-    && chmod 750 files upload includes/libraries/csrfp/log
+    && chmod 700 storage/sk secrets \
+    && chmod 750 storage storage/files storage/upload storage/config storage/backups app/includes/libraries/csrfp/log
 
 # Remove unnecessary files for production
 RUN rm -rf \
@@ -149,7 +184,7 @@ RUN rm -rf \
     Dockerfile
 
 # Setup cron for TeamPass scheduler
-RUN echo "* * * * * php /var/www/html/sources/scheduler.php > /dev/null 2>&1" > /var/spool/cron/crontabs/nginx \
+RUN echo "* * * * * php /var/www/html/app/sources/scheduler.php > /dev/null 2>&1" > /var/spool/cron/crontabs/nginx \
     && chmod 600 /var/spool/cron/crontabs/nginx
 
 # Copy and set entrypoint script
@@ -163,8 +198,11 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 # Expose HTTP port
 EXPOSE 80
 
-# Define volumes for persistent data
-VOLUME ["/var/www/html/sk", "/var/www/html/files", "/var/www/html/upload"]
+# Define volumes for persistent data.
+# storage/config holds the install state (settings.php, csrfp.config.php) and
+# secrets holds the Defuse master key: both must persist across container
+# recreation, otherwise TeamPass would try to reinstall itself (issue #5236).
+VOLUME ["/var/www/html/storage/sk", "/var/www/html/storage/files", "/var/www/html/storage/upload", "/var/www/html/storage/config", "/var/www/html/secrets"]
 
 # Set entrypoint and default command
 ENTRYPOINT ["/docker-entrypoint.sh"]

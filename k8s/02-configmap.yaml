@@ -1,0 +1,61 @@
+# ============================================
+# TeamPass - ConfigMap
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: teampass-config
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: app
+data:
+  DB_HOST: "teampass-db"
+  DB_PORT: "3306"
+  DB_NAME: "teampass"
+  DB_USER: "teampass"
+  DB_PREFIX: "teampass_"
+  INSTALL_MODE: "manual"
+  ADMIN_EMAIL: "admin@teampass.local"
+  # URL de acesso via NodePort do k3s no Raspberry Pi
+  # Substitua pelo IP real do seu Pi
+  TEAMPASS_URL: "http://192.168.1.100:30090"
+  PHP_MEMORY_LIMIT: "256M"
+  PHP_UPLOAD_MAX_FILESIZE: "50M"
+  PHP_POST_MAX_SIZE: "50M"
+  PHP_MAX_EXECUTION_TIME: "120"
+---
+# ============================================
+# TeamPass - ConfigMap MariaDB
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-config
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: database
+data:
+  custom.cnf: |
+    [mysqld]
+    sql_mode = NO_ENGINE_SUBSTITUTION
+    character-set-server = utf8mb4
+    collation-server = utf8mb4_unicode_ci
+    max_allowed_packet = 64M
+    max_connections = 50
+    table_open_cache = 512
+    tmp_table_size = 32M
+    max_heap_table_size = 32M
+    innodb_buffer_pool_size = 128M
+    innodb_log_file_size = 32M
+    innodb_flush_log_at_trx_commit = 2
+    innodb_flush_method = fsync
+    slow_query_log = 0
+    long_query_time = 2
+
+    [client]
+    default-character-set = utf8mb4
+
+    [mysql]
+    default-character-set = utf8mb4

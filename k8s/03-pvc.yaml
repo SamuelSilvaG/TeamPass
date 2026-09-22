@@ -1,0 +1,109 @@
+# ============================================
+# TeamPass - PersistentVolumeClaims
+# Usa o storage class "local-path" padrão do k3s
+# Dados ficam em /var/lib/rancher/k3s/storage/ no Pi
+# ============================================
+
+# Chave de criptografia (saltkey) — CRÍTICO: não pode ser perdido
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-sk
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 100Mi
+---
+# Arquivos anexados às senhas
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-files
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Uploads temporários
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-upload
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 500Mi
+---
+# Estado de instalação (settings.php, csrfp.config.php)
+# Sem este volume o TeamPass reinstala a cada pod restart
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-config
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 100Mi
+---
+# Chave mestra Defuse (cifra todas as senhas)
+# CRÍTICO: backup obrigatório antes de qualquer manutenção
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-secrets
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 100Mi
+---
+# Banco de dados MariaDB
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-db
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
