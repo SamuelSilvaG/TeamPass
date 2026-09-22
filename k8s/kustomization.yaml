@@ -20,8 +20,6 @@ resources:
   - 03-pvc.yaml
   - 04-mariadb.yaml
   - 05-teampass.yaml
-  # Descomente se precisar expor o registry via NodePort
-  # - 06-registry-nodeport.yaml
 
 commonLabels:
   app.kubernetes.io/managed-by: kustomize
