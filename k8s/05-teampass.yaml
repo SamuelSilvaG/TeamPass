@@ -81,13 +81,13 @@ spec:
 
           volumeMounts:
             - name: sk
-              mountPath: /var/www/html/storage/sk
+              mountPath: /var/www/html/sk
             - name: files
-              mountPath: /var/www/html/storage/files
+              mountPath: /var/www/html/files
             - name: upload
-              mountPath: /var/www/html/storage/upload
+              mountPath: /var/www/html/upload
             - name: config
-              mountPath: /var/www/html/storage/config
+              mountPath: /var/www/html/includes/config
             - name: secrets
               mountPath: /var/www/html/secrets
 

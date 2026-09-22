@@ -145,30 +145,27 @@ COPY --from=composer-builder --chown=nginx:nginx /app/vendor ./vendor
 
 # Create required directories with proper permissions
 RUN mkdir -p \
-    storage/sk \
-    storage/files \
-    storage/upload \
-    storage/config \
-    storage/backups \
+    sk \
+    files \
+    upload \
+    includes/config \
     secrets \
-    includes/libraries/csrfp/log \\
+    includes/libraries/csrfp/log \
     /var/lib/nginx/tmp \
     /var/log/supervisor \
     /run/nginx \
     && chown -R nginx:nginx \
-        storage \
-        storage/sk \
-        storage/files \
-        storage/upload \
-        storage/config \
-        storage/backups \
+        sk \
+        files \
+        upload \
+        includes/config \
         secrets \
-        includes/libraries/csrfp/log \\
+        includes/libraries/csrfp/log \
         /var/lib/nginx \
         /var/log \
         /run/nginx \
-    && chmod 700 storage/sk secrets \
-    && chmod 750 storage storage/files storage/upload storage/config storage/backups includes/libraries/csrfp/log
+    && chmod 700 sk secrets \
+    && chmod 750 files upload includes/config includes/libraries/csrfp/log
 
 # Remove unnecessary files for production
 RUN rm -rf \
@@ -202,7 +199,7 @@ EXPOSE 80
 # storage/config holds the install state (settings.php, csrfp.config.php) and
 # secrets holds the Defuse master key: both must persist across container
 # recreation, otherwise TeamPass would try to reinstall itself (issue #5236).
-VOLUME ["/var/www/html/storage/sk", "/var/www/html/storage/files", "/var/www/html/storage/upload", "/var/www/html/storage/config", "/var/www/html/secrets"]
+VOLUME ["/var/www/html/sk", "/var/www/html/files", "/var/www/html/upload", "/var/www/html/includes/config", "/var/www/html/secrets"]
 
 # Set entrypoint and default command
 ENTRYPOINT ["/docker-entrypoint.sh"]
