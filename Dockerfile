@@ -15,8 +15,8 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 
 # Copy local packages required by composer
-COPY app/includes/libraries/teampassclasses ./app/includes/libraries/teampassclasses
-COPY app/includes/libraries/ezimuel ./app/includes/libraries/ezimuel
+COPY includes/libraries/teampassclasses ./includes/libraries/teampassclasses
+COPY includes/libraries/ezimuel ./includes/libraries/ezimuel
 
 # Install production dependencies only
 RUN composer install \
@@ -141,7 +141,7 @@ WORKDIR /var/www/html
 COPY --chown=nginx:nginx . .
 
 # Copy vendor from composer builder
-COPY --from=composer-builder --chown=nginx:nginx /app/app/vendor ./app/vendor
+COPY --from=composer-builder --chown=nginx:nginx /app/vendor ./vendor
 
 # Create required directories with proper permissions
 RUN mkdir -p \
@@ -151,7 +151,7 @@ RUN mkdir -p \
     storage/config \
     storage/backups \
     secrets \
-    app/includes/libraries/csrfp/log \
+    includes/libraries/csrfp/log \\
     /var/lib/nginx/tmp \
     /var/log/supervisor \
     /run/nginx \
@@ -163,12 +163,12 @@ RUN mkdir -p \
         storage/config \
         storage/backups \
         secrets \
-        app/includes/libraries/csrfp/log \
+        includes/libraries/csrfp/log \\
         /var/lib/nginx \
         /var/log \
         /run/nginx \
     && chmod 700 storage/sk secrets \
-    && chmod 750 storage storage/files storage/upload storage/config storage/backups app/includes/libraries/csrfp/log
+    && chmod 750 storage storage/files storage/upload storage/config storage/backups includes/libraries/csrfp/log
 
 # Remove unnecessary files for production
 RUN rm -rf \
