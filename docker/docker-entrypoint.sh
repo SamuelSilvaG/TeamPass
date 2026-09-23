@@ -77,7 +77,15 @@ create_directories() {
     mkdir -p /var/www/html/sk
     mkdir -p /var/www/html/files
     mkdir -p /var/www/html/upload
+    mkdir -p /var/www/html/includes/config
+    mkdir -p /var/www/html/secrets
     mkdir -p /var/www/html/includes/libraries/csrfp/log
+
+    # Restore default config files if volume was mounted empty
+    if [ ! -f "/var/www/html/includes/config/include.php" ] && [ -d "/var/www/html/includes/config.dist" ]; then
+        echo -e "${BLUE}📦 Initializing /var/www/html/includes/config from defaults...${NC}"
+        cp -a /var/www/html/includes/config.dist/. /var/www/html/includes/config/
+    fi
 
     echo -e "${GREEN}✅ Directories created${NC}"
 }
@@ -89,11 +97,15 @@ set_permissions() {
     chown -R nginx:nginx /var/www/html/sk
     chown -R nginx:nginx /var/www/html/files
     chown -R nginx:nginx /var/www/html/upload
+    chown -R nginx:nginx /var/www/html/includes/config
+    chown -R nginx:nginx /var/www/html/secrets
     chown -R nginx:nginx /var/www/html/includes/libraries/csrfp/log
 
     chmod 700 /var/www/html/sk
+    chmod 700 /var/www/html/secrets
     chmod 750 /var/www/html/files
     chmod 750 /var/www/html/upload
+    chmod 750 /var/www/html/includes/config
     chmod 750 /var/www/html/includes/libraries/csrfp/log
 
     echo -e "${GREEN}✅ Permissions set${NC}"

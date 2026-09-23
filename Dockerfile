@@ -143,6 +143,9 @@ COPY --chown=nginx:nginx . .
 # Copy vendor from composer builder
 COPY --from=composer-builder --chown=nginx:nginx /app/vendor ./vendor
 
+# Preserve default includes/config files for volume bootstrap
+RUN cp -a includes/config includes/config.dist
+
 # Create required directories with proper permissions
 RUN mkdir -p \
     sk \
