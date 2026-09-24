@@ -59,6 +59,54 @@ if (
 ?>
 
 <script type="text/javascript">
+    // Polyfill for clipboard writeText on HTTP / non-secure contexts
+    (function() {
+        function fallbackCopy(text) {
+            return new Promise(function(resolve, reject) {
+                var textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.top = "-9999px";
+                textArea.style.left = "-9999px";
+                textArea.setAttribute("readonly", "");
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    var successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    if (successful) {
+                        resolve();
+                    } else {
+                        reject(new Error('execCommand copy failed'));
+                    }
+                } catch (err) {
+                    document.body.removeChild(textArea);
+                    reject(err);
+                }
+            });
+        }
+
+        if (!navigator.clipboard) {
+            try {
+                Object.defineProperty(navigator, 'clipboard', {
+                    value: { writeText: fallbackCopy },
+                    writable: true,
+                    configurable: true
+                });
+            } catch (e) {
+                navigator.clipboard = { writeText: fallbackCopy };
+            }
+        } else if (navigator.clipboard.writeText) {
+            var originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
+            navigator.clipboard.writeText = function(text) {
+                return originalWriteText(text).catch(function(err) {
+                    return fallbackCopy(text);
+                });
+            };
+        }
+    })();
+
     var userScrollPosition = 0,
         debugJavascript = false;
     let hourInMinutes = 60;
