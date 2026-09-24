@@ -87,6 +87,7 @@ RUN apk add --no-cache \
     && apk add --no-cache --virtual .build-deps \
     # Build dependencies
     $PHPIZE_DEPS \
+    linux-headers \
     openldap-dev \
     gmp-dev \
     icu-dev \
@@ -113,6 +114,8 @@ RUN apk add --no-cache \
         opcache \
         mbstring \
         xml \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
     # Cleanup build dependencies
     && apk del .build-deps \
     && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
