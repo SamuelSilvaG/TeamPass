@@ -24,6 +24,10 @@ data:
   PHP_UPLOAD_MAX_FILESIZE: "50M"
   PHP_POST_MAX_SIZE: "50M"
   PHP_MAX_EXECUTION_TIME: "120"
+  # Redis session storage
+  REDIS_HOST: "teampass-redis"
+  REDIS_PORT: "6379"
+  REDIS_PREFIX: "teampass_sess_"
 ---
 # ============================================
 # TeamPass - ConfigMap MariaDB

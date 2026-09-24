@@ -1,0 +1,114 @@
+# ============================================
+# TeamPass - Redis Service + Deployment + PVC
+# Utilizado para armazenamento criptografado de sessões e cache
+# ============================================
+
+# PVC para persistência do Redis (AOF / RDB)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: teampass-redis
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 500Mi
+---
+# Service interno do Redis
+apiVersion: v1
+kind: Service
+metadata:
+  name: teampass-redis
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: cache
+    app: teampass-redis
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+      protocol: TCP
+  selector:
+    app: teampass-redis
+---
+# Deployment do Redis
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teampass-redis
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: cache
+    app: teampass-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: teampass-redis
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: teampass-redis
+        app.kubernetes.io/name: teampass
+        app.kubernetes.io/component: cache
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --protected-mode
+            - "no"
+            - --save
+            - "60"
+            - "1"
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: teampass-redis

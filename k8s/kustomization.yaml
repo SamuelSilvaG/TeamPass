@@ -20,6 +20,7 @@ resources:
   - 03-pvc.yaml
   - 04-mariadb.yaml
   - 05-teampass.yaml
+  - 06-redis.yaml
 
 commonLabels:
   app.kubernetes.io/managed-by: kustomize
