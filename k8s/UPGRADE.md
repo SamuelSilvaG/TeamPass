@@ -1,5 +1,48 @@
 # Guia de Atualização — TeamPass no k3s (Raspberry Pi 4)
 
+---
+
+## ⚠️ Antes de qualquer upgrade: garantir que settings.php está no PVC
+
+Este é o passo mais crítico e frequentemente esquecido.
+
+O `settings.php` contém as credenciais do banco e o marcador de instalação.
+Se ele existir **apenas na camada do container** (e não no PVC), a nova imagem
+vai achar que o TeamPass não está instalado e pedirá reinstalação do zero.
+
+### Verificar onde está o settings.php
+
+```bash
+# Inspecionar — deve mostrar se é symlink (→) ou arquivo real
+kubectl exec -n teampass deployment/teampass -- \
+  ls -la /var/www/html/includes/config/
+```
+
+- **Se for symlink** (`→ /var/www/html/storage/config/settings.php`) → já está no PVC ✅
+- **Se for arquivo real** → está só no container e vai sumir no upgrade ❌
+
+### Persistir no PVC antes de atualizar
+
+Execute **com a versão atual ainda rodando**:
+
+```bash
+kubectl exec -n teampass deployment/teampass -- \
+  sh -c "mkdir -p /var/www/html/storage/config && \
+         cp /var/www/html/includes/config/settings.php /var/www/html/storage/config/ && \
+         cp /var/www/html/includes/config/csrfp.config.php /var/www/html/storage/config/ 2>/dev/null || true && \
+         echo '✅ Copiado' && \
+         ls -la /var/www/html/storage/config/"
+```
+
+Confirme o conteúdo antes de prosseguir:
+
+```bash
+kubectl exec -n teampass deployment/teampass -- \
+  cat /var/www/html/storage/config/settings.php
+```
+
+Só então aplique o novo manifesto.
+
 Este documento descreve o passo a passo para atualizar o TeamPass de uma versão para outra no ambiente k3s.
 
 ---
