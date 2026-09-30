@@ -1,5 +1,6 @@
 # ============================================
 # TeamPass - Application Deployment + Service
+# Versão: 3.2.2.5 (migrado de 3.1.7.6)
 # ============================================
 # A imagem é construída com: ./scripts/build-push.sh [TAG] [REGISTRY]
 # e empurrada para o registry local do k3s (NodePort 30500)
@@ -15,8 +16,7 @@ metadata:
     app.kubernetes.io/name: teampass
     app.kubernetes.io/component: app
   annotations:
-    # Controle de versão da imagem — atualizado pelo build-push.sh
-    deployment.kubernetes.io/image-tag: "3.1.7.6"
+    deployment.kubernetes.io/image-tag: "3.2.2.5"
 spec:
   replicas: 1
   selector:
@@ -39,7 +39,7 @@ spec:
       # Aguarda o banco estar pronto antes de iniciar
       initContainers:
         - name: wait-for-db
-          image: busybox:1.36
+          image: docker.io/library/busybox:1.36
           command:
             - sh
             - -c
@@ -54,9 +54,8 @@ spec:
       containers:
         - name: teampass
           # Imagem buildada pelo scripts/build-push.sh e disponível no registry do k3s
-          # Formato: localhost:30500/teampass:<tag>
           # Troque a tag aqui ao fazer upgrade de versão
-          image: localhost:30500/teampass:3.1.7.6
+          image: localhost:30500/teampass:3.2.2.5
           imagePullPolicy: Always
 
           envFrom:
@@ -79,15 +78,22 @@ spec:
             - containerPort: 80
               name: http
 
+          # -------------------------------------------------------
+          # ATENÇÃO: caminhos mudaram na 3.2.x em relação à 3.1.7.6
+          # 3.1.7.6: /var/www/html/sk, /files, /upload, /includes/config
+          # 3.2.2.5: /var/www/html/storage/sk, /storage/files, etc.
+          # Os PVCs (dados) são os mesmos — apenas o mountPath muda.
+          # O entrypoint migra o banco automaticamente.
+          # -------------------------------------------------------
           volumeMounts:
             - name: sk
-              mountPath: /var/www/html/sk
+              mountPath: /var/www/html/storage/sk
             - name: files
-              mountPath: /var/www/html/files
+              mountPath: /var/www/html/storage/files
             - name: upload
-              mountPath: /var/www/html/upload
+              mountPath: /var/www/html/storage/upload
             - name: config
-              mountPath: /var/www/html/includes/config
+              mountPath: /var/www/html/storage/config
             - name: secrets
               mountPath: /var/www/html/secrets
 
@@ -95,7 +101,7 @@ spec:
             httpGet:
               path: /health
               port: 80
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
@@ -104,7 +110,7 @@ spec:
             httpGet:
               path: /health
               port: 80
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
@@ -150,6 +156,5 @@ spec:
   ports:
     - port: 80
       targetPort: 80
-      # NodePort fixo para acesso via http://<IP-DO-PI>:30090
-      nodePort: 30090
+      nodePort: 30080
       name: http
