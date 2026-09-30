@@ -1,0 +1,152 @@
+# ============================================
+# Job de Migração: 3.1.7.6 → 3.2.2.5
+# ============================================
+# EXECUTE ESTE JOB ANTES de trocar a imagem para 3.2.2.5
+#
+# O que faz:
+#   1. Copia dados dos caminhos antigos (3.1.7.6) para os novos (3.2.2.5)
+#   2. Corrige os caminhos dentro do settings.php
+#
+# Caminhos que mudam:
+#   /var/www/html/sk            → /var/www/html/storage/sk
+#   /var/www/html/files         → /var/www/html/storage/files
+#   /var/www/html/upload        → /var/www/html/storage/upload
+#   /var/www/html/includes/config → /var/www/html/storage/config
+#   secrets e DB permanecem iguais
+#
+# Uso:
+#   kubectl apply -f k8s/migration-job.yaml
+#   kubectl wait --for=condition=complete job/teampass-migrate-317-to-322 -n teampass --timeout=120s
+#   kubectl logs -n teampass job/teampass-migrate-317-to-322
+# ============================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: teampass-migrate-317-to-322
+  namespace: teampass
+  labels:
+    app.kubernetes.io/name: teampass
+    app.kubernetes.io/component: migration
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+        - name: migrate
+          image: docker.io/library/busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "  TeamPass — Migração 3.1.7.6 → 3.2.2.5"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo ""
+
+              # ── 1. saltkey ──────────────────────────────
+              echo "📁 Migrando saltkey..."
+              if [ -d /old-sk ] && [ "$(ls -A /old-sk 2>/dev/null)" ]; then
+                cp -av /old-sk/. /new-sk/
+                echo "✅ saltkey copiado"
+              else
+                echo "⚠️  /old-sk vazio ou não montado — ignorando"
+              fi
+
+              # ── 2. files ────────────────────────────────
+              echo "📁 Migrando files..."
+              if [ -d /old-files ] && [ "$(ls -A /old-files 2>/dev/null)" ]; then
+                cp -av /old-files/. /new-files/
+                echo "✅ files copiado"
+              else
+                echo "⚠️  /old-files vazio ou não montado — ignorando"
+              fi
+
+              # ── 3. upload ───────────────────────────────
+              echo "📁 Migrando upload..."
+              if [ -d /old-upload ] && [ "$(ls -A /old-upload 2>/dev/null)" ]; then
+                cp -av /old-upload/. /new-upload/
+                echo "✅ upload copiado"
+              else
+                echo "⚠️  /old-upload vazio — ignorando"
+              fi
+
+              # ── 4. config (settings.php + csrfp) ────────
+              echo "📁 Migrando config..."
+              if [ -d /old-config ] && [ "$(ls -A /old-config 2>/dev/null)" ]; then
+                cp -av /old-config/. /new-config/
+                echo "✅ config copiado"
+
+                # Corrigir caminhos dentro do settings.php
+                SETTINGS=/new-config/settings.php
+                if [ -f "$SETTINGS" ]; then
+                  echo "🔧 Corrigindo caminhos em settings.php..."
+                  # Caminho do saltkey
+                  sed -i "s|/var/www/html/sk|/var/www/html/storage/sk|g" "$SETTINGS"
+                  # Caminho de files
+                  sed -i "s|/var/www/html/files|/var/www/html/storage/files|g" "$SETTINGS"
+                  # Caminho de upload
+                  sed -i "s|/var/www/html/upload|/var/www/html/storage/upload|g" "$SETTINGS"
+                  # Caminho de config (o proprio)
+                  sed -i "s|/var/www/html/includes/config|/var/www/html/storage/config|g" "$SETTINGS"
+                  # Caminho base do TeamPass (se ainda tiver /TeamPass/)
+                  sed -i "s|/var/www/html/TeamPass/|/var/www/html/|g" "$SETTINGS"
+                  echo "✅ settings.php corrigido"
+                  echo ""
+                  echo "=== Conteúdo do settings.php após correção ==="
+                  cat "$SETTINGS"
+                fi
+              else
+                echo "⚠️  /old-config vazio — ignorando (TeamPass pedirá reinstalação!)"
+              fi
+
+              echo ""
+              echo "✅ Migração de arquivos concluída!"
+              echo ""
+              echo "Próximos passos:"
+              echo "  1. kubectl apply -f k8s/05-teampass.yaml"
+              echo "  2. kubectl logs -n teampass deployment/teampass --follow"
+
+          volumeMounts:
+            # Volumes ANTIGOS (caminhos da 3.1.7.6) — fonte
+            - name: sk
+              mountPath: /old-sk
+            - name: files
+              mountPath: /old-files
+            - name: upload
+              mountPath: /old-upload
+            - name: config
+              mountPath: /old-config
+            # Volumes NOVOS (caminhos da 3.2.2.5) — destino
+            # São os mesmos PVCs, mas montados em subPaths diferentes
+            # para simular os novos caminhos dentro do mesmo volume
+            - name: sk
+              mountPath: /new-sk
+              subPath: storage_sk
+            - name: files
+              mountPath: /new-files
+              subPath: storage_files
+            - name: upload
+              mountPath: /new-upload
+              subPath: storage_upload
+            - name: config
+              mountPath: /new-config
+              subPath: storage_config
+
+      volumes:
+        - name: sk
+          persistentVolumeClaim:
+            claimName: teampass-sk
+        - name: files
+          persistentVolumeClaim:
+            claimName: teampass-files
+        - name: upload
+          persistentVolumeClaim:
+            claimName: teampass-upload
+        - name: config
+          persistentVolumeClaim:
+            claimName: teampass-config
