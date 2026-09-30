@@ -21,6 +21,7 @@ resources:
   - 04-mariadb.yaml
   - 05-teampass.yaml
   - 06-redis.yaml
+  - 07-adminer.yaml
 
 commonLabels:
   app.kubernetes.io/managed-by: kustomize
